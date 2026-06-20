@@ -13,6 +13,7 @@ html, body {
   height: 100%; overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
   background: #fff;
+  touch-action: manipulation;
 }
 .grid {
   display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
@@ -29,42 +30,30 @@ html, body {
 .q2 { background: #FFFBEB; border-color: #FDE68A; }
 .q3 { background: #EFF6FF; border-color: #BFDBFE; }
 .q4 { background: #F9FAFB; border-color: #E5E7EB; }
-.qlabel {
-  font-size: 12px; font-weight: 700; letter-spacing: 0.02em; flex-shrink: 0;
-}
+.qlabel { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; flex-shrink: 0; }
 .q1 .qlabel { color: #DC2626; }
 .q2 .qlabel { color: #D97706; }
 .q3 .qlabel { color: #2563EB; }
 .q4 .qlabel { color: #6B7280; }
 .items {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 3px;
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
   min-height: 0; -webkit-overflow-scrolling: touch;
 }
 .item {
-  display: flex; align-items: flex-start; gap: 4px;
+  display: flex; align-items: center; gap: 4px;
   font-size: 13px; line-height: 1.35; color: #1F2937;
-  position: relative;
+  padding: 3px 0;
 }
 .item-text { flex: 1; word-break: break-word; }
-.item-menu-btn {
-  background: none; border: none; cursor: pointer;
-  padding: 0 2px; font-size: 13px; color: #9CA3AF;
+.item-btn {
+  background: none; border: none;
+  padding: 4px; font-size: 15px; color: #9CA3AF;
   flex-shrink: 0; line-height: 1;
+  min-width: 28px; min-height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation;
 }
-.menu-popup {
-  position: absolute; right: 0; top: 18px;
-  background: #fff; border: 1px solid #E5E7EB; border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 30;
-  min-width: 110; overflow: hidden;
-}
-.menu-popup button {
-  display: block; width: 100%; text-align: left;
-  padding: 7px 11px; border: none; background: none;
-  font-size: 12px; color: #374151; cursor: pointer;
-  font-family: inherit;
-}
-.menu-popup button:active { background: #F3F4F6; }
-.menu-popup .del { color: #EF4444; border-top: 1px solid #E5E7EB; }
+.item-btn:active { color: #374151; }
 .add-row { display: flex; gap: 5px; flex-shrink: 0; }
 .add-input {
   flex: 1; padding: 5px 8px; border-radius: 8px;
@@ -78,142 +67,192 @@ html, body {
 .q4 .add-input { border-color: #E5E7EB; }
 .add-btn {
   width: 30px; height: 30px; border: none; border-radius: 8px;
-  color: #fff; font-size: 18px; cursor: pointer;
+  color: #fff; font-size: 18px;
   flex-shrink: 0; display: flex; align-items: center;
   justify-content: center; line-height: 1; font-family: inherit;
+  touch-action: manipulation;
 }
 .q1 .add-btn { background: #DC2626; }
 .q2 .add-btn { background: #D97706; }
 .q3 .add-btn { background: #2563EB; }
 .q4 .add-btn { background: #6B7280; }
-.overlay { position: fixed; inset: 0; z-index: 10; }
+
+/* Modal */
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; touch-action: manipulation;
+}
+.modal {
+  background: #fff; border-radius: 14px; padding: 16px;
+  width: 260px; box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+.modal-title {
+  font-size: 14px; font-weight: 700; color: #1F2937;
+  margin-bottom: 12px; text-align: center;
+  word-break: break-word;
+}
+.modal-btn {
+  display: block; width: 100%; text-align: center;
+  padding: 10px; border: none; background: none;
+  font-size: 14px; color: #374151;
+  border-radius: 8px; font-family: inherit;
+  touch-action: manipulation;
+}
+.modal-btn:active { background: #F3F4F6; }
+.modal-cancel {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid #E5E7EB;
+  color: #9CA3AF;
+}
 </style>
 </head>
 <body>
 
 <div class="grid" id="app"></div>
+<div id="modal-root"></div>
 
 <script>
-const QS = [
+var QS = [
   { id:"q1", label:"🔴 緊急 × 重要", cls:"q1" },
   { id:"q2", label:"🟡 重要", cls:"q2" },
   { id:"q3", label:"🔵 緊急", cls:"q3" },
-  { id:"q4", label:"⚪ あとで", cls:"q4" },
+  { id:"q4", label:"⚪ あとで", cls:"q4" }
 ];
 
-const KEY = "qmemo";
-let data;
+var KEY = "qmemo";
+var data;
 try { data = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { data = {}; }
-QS.forEach(q => { if (!data[q.id]) data[q.id] = []; });
+QS.forEach(function(q) { if (!data[q.id]) data[q.id] = []; });
 
 function save() { localStorage.setItem(KEY, JSON.stringify(data)); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
-let openMenu = null;
+function closeModal() {
+  document.getElementById("modal-root").innerHTML = "";
+}
 
-function closeMenu() {
-  if (openMenu) { openMenu.remove(); openMenu = null; }
-  const ov = document.querySelector(".overlay");
-  if (ov) ov.remove();
+function showMoveModal(fromQId, item) {
+  var root = document.getElementById("modal-root");
+  var bg = document.createElement("div");
+  bg.className = "modal-bg";
+
+  var modal = document.createElement("div");
+  modal.className = "modal";
+
+  var title = document.createElement("div");
+  title.className = "modal-title";
+  title.textContent = "「" + item.text + "」を移動";
+  modal.appendChild(title);
+
+  QS.forEach(function(oq) {
+    if (oq.id === fromQId) return;
+    var btn = document.createElement("button");
+    btn.className = "modal-btn";
+    btn.textContent = oq.label + " へ";
+    btn.ontouchend = function(e) { e.preventDefault(); doMove(fromQId, item.id, oq.id); };
+    btn.onclick = function() { doMove(fromQId, item.id, oq.id); };
+    modal.appendChild(btn);
+  });
+
+  var cancel = document.createElement("button");
+  cancel.className = "modal-btn modal-cancel";
+  cancel.textContent = "キャンセル";
+  cancel.ontouchend = function(e) { e.preventDefault(); closeModal(); };
+  cancel.onclick = function() { closeModal(); };
+  modal.appendChild(cancel);
+
+  bg.ontouchend = function(e) { if (e.target === bg) { e.preventDefault(); closeModal(); } };
+  bg.onclick = function(e) { if (e.target === bg) closeModal(); };
+
+  bg.appendChild(modal);
+  root.innerHTML = "";
+  root.appendChild(bg);
+}
+
+function doMove(fromQId, itemId, toQId) {
+  var item = null;
+  data[fromQId] = data[fromQId].filter(function(x) {
+    if (x.id === itemId) { item = x; return false; }
+    return true;
+  });
+  if (item) data[toQId].push(item);
+  save(); closeModal(); render();
+}
+
+function doDelete(qId, itemId) {
+  data[qId] = data[qId].filter(function(x) { return x.id !== itemId; });
+  save(); render();
 }
 
 function render() {
-  const app = document.getElementById("app");
+  var app = document.getElementById("app");
   app.innerHTML = "";
-  QS.forEach(q => {
-    const div = document.createElement("div");
+
+  QS.forEach(function(q) {
+    var div = document.createElement("div");
     div.className = "quad " + q.cls;
 
-    // label
-    const lbl = document.createElement("div");
+    var lbl = document.createElement("div");
     lbl.className = "qlabel";
     lbl.textContent = q.label;
     div.appendChild(lbl);
 
-    // items
-    const items = document.createElement("div");
+    var items = document.createElement("div");
     items.className = "items";
-    data[q.id].forEach(item => {
-      const row = document.createElement("div");
+
+    data[q.id].forEach(function(item) {
+      var row = document.createElement("div");
       row.className = "item";
 
-      const txt = document.createElement("span");
+      var txt = document.createElement("span");
       txt.className = "item-text";
       txt.textContent = item.text;
       row.appendChild(txt);
 
-      const btn = document.createElement("button");
-      btn.className = "item-menu-btn";
-      btn.textContent = "⋯";
-      btn.addEventListener("touchend", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        closeMenu();
+      // move button
+      var moveBtn = document.createElement("button");
+      moveBtn.className = "item-btn";
+      moveBtn.textContent = "↗";
+      moveBtn.ontouchend = function(e) { e.preventDefault(); e.stopPropagation(); showMoveModal(q.id, item); };
+      moveBtn.onclick = function(e) { e.stopPropagation(); showMoveModal(q.id, item); };
+      row.appendChild(moveBtn);
 
-        const overlay = document.createElement("div");
-        overlay.className = "overlay";
-        overlay.addEventListener("touchend", (ev) => { ev.preventDefault(); closeMenu(); });
-        overlay.addEventListener("click", closeMenu);
-        document.body.appendChild(overlay);
+      // delete button
+      var delBtn = document.createElement("button");
+      delBtn.className = "item-btn";
+      delBtn.textContent = "✕";
+      delBtn.style.color = "#EF4444";
+      delBtn.ontouchend = function(e) { e.preventDefault(); e.stopPropagation(); doDelete(q.id, item.id); };
+      delBtn.onclick = function(e) { e.stopPropagation(); doDelete(q.id, item.id); };
+      row.appendChild(delBtn);
 
-        const menu = document.createElement("div");
-        menu.className = "menu-popup";
-
-        QS.filter(oq => oq.id !== q.id).forEach(oq => {
-          const mb = document.createElement("button");
-          mb.textContent = oq.label + "へ";
-          function doMove(ev) {
-            ev.preventDefault(); ev.stopPropagation();
-            data[q.id] = data[q.id].filter(x => x.id !== item.id);
-            data[oq.id].push(item);
-            save(); closeMenu(); render();
-          }
-          mb.addEventListener("touchend", doMove);
-          mb.addEventListener("click", doMove);
-          menu.appendChild(mb);
-        });
-
-        const db = document.createElement("button");
-        db.className = "del";
-        db.textContent = "削除";
-        function doDelete(ev) {
-          ev.preventDefault(); ev.stopPropagation();
-          data[q.id] = data[q.id].filter(x => x.id !== item.id);
-          save(); closeMenu(); render();
-        }
-        db.addEventListener("touchend", doDelete);
-        db.addEventListener("click", doDelete);
-        menu.appendChild(db);
-
-        row.appendChild(menu);
-        openMenu = menu;
-      });
-      row.appendChild(btn);
       items.appendChild(row);
     });
     div.appendChild(items);
 
-    // add row
-    const addRow = document.createElement("div");
+    var addRow = document.createElement("div");
     addRow.className = "add-row";
-    const input = document.createElement("input");
+    var input = document.createElement("input");
     input.type = "text";
     input.className = "add-input";
     input.placeholder = "追加...";
     input.enterKeyHint = "done";
 
-    const addBtn = document.createElement("button");
+    var addBtn = document.createElement("button");
     addBtn.className = "add-btn";
     addBtn.textContent = "+";
 
-    const doAdd = () => {
-      const t = input.value.trim();
+    var doAdd = function() {
+      var t = input.value.trim();
       if (!t) return;
       data[q.id].push({ id: uid(), text: t });
       save(); render();
     };
 
-    input.addEventListener("keydown", e => { if (e.key === "Enter") doAdd(); });
-    addBtn.addEventListener("click", doAdd);
+    input.addEventListener("keydown", function(e) { if (e.key === "Enter") doAdd(); });
+    addBtn.ontouchend = function(e) { e.preventDefault(); doAdd(); };
+    addBtn.onclick = function() { doAdd(); };
     addRow.appendChild(input);
     addRow.appendChild(addBtn);
     div.appendChild(addRow);
